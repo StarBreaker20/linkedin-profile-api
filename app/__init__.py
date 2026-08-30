@@ -1,0 +1,3 @@
+"""LinkedIn Profile API — a browser-free, reverse-engineered Voyager client."""
+
+__version__ = "0.1.0"

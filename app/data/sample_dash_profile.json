@@ -1,0 +1,119 @@
+{
+  "data": {
+    "$type": "com.linkedin.restli.common.CollectionResponse",
+    "entityUrn": "urn:li:collectionResponse:SYNTH",
+    "paging": {"count": 10, "start": 0, "total": 1},
+    "*elements": ["urn:li:fsd_profile:SYN1"]
+  },
+  "included": [
+    {
+      "$type": "com.linkedin.voyager.dash.identity.profile.Profile",
+      "entityUrn": "urn:li:fsd_profile:SYN1",
+      "publicIdentifier": "ada-byron",
+      "objectUrn": "urn:li:member:999",
+      "firstName": "Ada",
+      "lastName": "Byron",
+      "headline": "Mathematician & first programmer",
+      "summary": "Notes on the Analytical Engine.",
+      "*industry": "urn:li:fsd_industry:4",
+      "industryUrn": "urn:li:fsd_industry:4",
+      "geoLocation": {"*geo": "urn:li:fsd_geo:100", "geoUrn": "urn:li:fsd_geo:100"},
+      "location": {"countryCode": "gb"},
+      "premium": true,
+      "influencer": false,
+      "profilePicture": {
+        "displayImageReference": {
+          "vectorImage": {
+            "rootUrl": "https://media.licdn.com/pic/",
+            "artifacts": [
+              {"width": 100, "height": 100, "fileIdentifyingUrlPathSegment": "100/a.jpg"},
+              {"width": 400, "height": 400, "fileIdentifyingUrlPathSegment": "400/a.jpg"}
+            ]
+          }
+        }
+      },
+      "*profilePositionGroups": "urn:li:collectionResponse:PG",
+      "*profileEducations": "urn:li:collectionResponse:ED",
+      "*profileSkills": "urn:li:collectionResponse:SK"
+    },
+    {
+      "$type": "com.linkedin.restli.common.CollectionResponse",
+      "entityUrn": "urn:li:collectionResponse:PG",
+      "*elements": ["urn:li:fsd_profilePositionGroup:(SYN1,g1)"]
+    },
+    {
+      "$type": "com.linkedin.voyager.dash.identity.profile.PositionGroup",
+      "entityUrn": "urn:li:fsd_profilePositionGroup:(SYN1,g1)",
+      "companyName": "Analytical Engines",
+      "*company": "urn:li:fsd_company:10",
+      "companyUrn": "urn:li:fsd_company:10",
+      "dateRange": {"start": {"year": 1840, "month": 1}},
+      "*profilePositionInPositionGroup": "urn:li:collectionResponse:PGP"
+    },
+    {
+      "$type": "com.linkedin.restli.common.CollectionResponse",
+      "entityUrn": "urn:li:collectionResponse:PGP",
+      "*elements": ["urn:li:fsd_profilePosition:(SYN1,p1)"]
+    },
+    {
+      "$type": "com.linkedin.voyager.dash.identity.profile.Position",
+      "entityUrn": "urn:li:fsd_profilePosition:(SYN1,p1)",
+      "title": "Lead Analyst",
+      "companyName": "Analytical Engines",
+      "*company": "urn:li:fsd_company:10",
+      "companyUrn": "urn:li:fsd_company:10",
+      "employmentType": "Full-time",
+      "locationName": "London",
+      "description": "Wrote the first algorithm.",
+      "dateRange": {"start": {"year": 1840, "month": 1}, "end": {"year": 1843, "month": 6}}
+    },
+    {
+      "$type": "com.linkedin.voyager.dash.organization.Company",
+      "entityUrn": "urn:li:fsd_company:10",
+      "name": "Analytical Engines",
+      "universalName": "analytical-engines",
+      "url": "https://www.linkedin.com/company/analytical-engines/",
+      "logo": {"vectorImage": {"rootUrl": "https://media.licdn.com/co/", "artifacts": [{"width": 200, "height": 200, "fileIdentifyingUrlPathSegment": "200/c.jpg"}]}}
+    },
+    {
+      "$type": "com.linkedin.restli.common.CollectionResponse",
+      "entityUrn": "urn:li:collectionResponse:ED",
+      "*elements": ["urn:li:fsd_profileEducation:(SYN1,e1)"]
+    },
+    {
+      "$type": "com.linkedin.voyager.dash.identity.profile.Education",
+      "entityUrn": "urn:li:fsd_profileEducation:(SYN1,e1)",
+      "schoolName": "Byron Academy",
+      "*school": "urn:li:fsd_school:20",
+      "schoolUrn": "urn:li:fsd_school:20",
+      "degreeName": "BSc",
+      "fieldOfStudy": "Mathematics",
+      "grade": "First",
+      "activities": "Chess club",
+      "description": "Studied mathematics.",
+      "dateRange": {"start": {"year": 1832}, "end": {"year": 1836}}
+    },
+    {
+      "$type": "com.linkedin.voyager.dash.organization.School",
+      "entityUrn": "urn:li:fsd_school:20",
+      "name": "Byron Academy",
+      "url": "https://www.linkedin.com/school/byron-academy/",
+      "logo": {"vectorImage": {"rootUrl": "https://media.licdn.com/sc/", "artifacts": [{"width": 200, "height": 200, "fileIdentifyingUrlPathSegment": "200/s.jpg"}]}}
+    },
+    {
+      "$type": "com.linkedin.voyager.dash.common.Geo",
+      "entityUrn": "urn:li:fsd_geo:100",
+      "defaultLocalizedName": "London, England, United Kingdom"
+    },
+    {
+      "$type": "com.linkedin.voyager.dash.common.Industry",
+      "entityUrn": "urn:li:fsd_industry:4",
+      "name": "Software Development"
+    },
+    {
+      "$type": "com.linkedin.restli.common.CollectionResponse",
+      "entityUrn": "urn:li:collectionResponse:SK",
+      "*elements": []
+    }
+  ]
+}
