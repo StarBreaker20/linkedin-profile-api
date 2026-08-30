@@ -12,5 +12,6 @@ RUN pip install -r requirements.txt
 COPY app ./app
 
 EXPOSE 8000
-# PORT is respected by hosts like Render/Railway/Fly; defaults to 8000 locally.
-CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}"]
+# Entrypoint resolves $PORT in Python (no shell needed) — see app/__main__.py.
+# Respects $PORT on hosts like Render/Railway/Fly; defaults to 8000 locally.
+CMD ["python", "-m", "app"]
