@@ -1,11 +1,12 @@
-# Railway config-as-code (reproducible deploy). Railway builds from the Dockerfile and
-# injects $PORT, which the container's start command binds to.
+# Railway config-as-code (reproducible deploy). Railway builds from the Dockerfile; the
+# container's own CMD (`sh -c "uvicorn ... --port ${PORT:-8000}"`) handles the port safely,
+# so we deliberately do NOT override startCommand here (a bare `$PORT` override can fail to
+# expand and crash the process).
 [build]
 builder = "DOCKERFILE"
 dockerfilePath = "Dockerfile"
 
 [deploy]
-startCommand = "uvicorn app.main:app --host 0.0.0.0 --port $PORT"
 healthcheckPath = "/health"
 healthcheckTimeout = 100
 restartPolicyType = "ON_FAILURE"
