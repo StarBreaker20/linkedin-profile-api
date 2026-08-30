@@ -1,0 +1,21 @@
+# Render Blueprint — free-tier Docker web service.
+# Render builds from the Dockerfile and injects $PORT, which the container binds to.
+services:
+  - type: web
+    name: linkedin-profile-api
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: free
+    healthCheckPath: /health
+    envVars:
+      # Secrets — set these in the Render dashboard (not stored in the repo).
+      - key: LINKEDIN_LI_AT
+        sync: false
+      - key: LINKEDIN_JSESSIONID
+        sync: false
+      - key: API_KEY
+        sync: false
+      - key: OUTBOUND_PROXY_URL
+        sync: false
+      - key: LINKEDIN_MAX_RPM
+        value: "8"

@@ -141,20 +141,26 @@ Liveness of the service itself.
 ## Deployment
 
 The service is a standard container (Dockerfile + `$PORT`), deployable to any host.
+Config-as-code is provided for both **Render** ([`render.yaml`](render.yaml)) and **Railway**
+([`railway.toml`](railway.toml)).
 
-### Railway (recommended)
-Config-as-code lives in [`railway.toml`](railway.toml) (builds from the Dockerfile,
-health-checks `/health`).
+### Render (free tier)
+1. On [render.com](https://render.com): **New → Web Service → Build and deploy from a Git
+   repository** → connect this repo. Render reads [`render.yaml`](render.yaml) (Docker
+   runtime, `/health` check, **free** plan).
+2. Add environment variables: `LINKEDIN_LI_AT` and `LINKEDIN_JSESSIONID` (from a
+   dedicated/throwaway account — see [Known limitations](#known-limitations)); optional
+   `API_KEY`.
+3. **Create Web Service** → you get a public HTTPS URL `https://<name>.onrender.com`.
+4. Verify `/health`, the live docs at `/docs`, and `/demo`.
 
-1. Push this repo to GitHub.
-2. On [railway.app](https://railway.app): **New Project → Deploy from GitHub repo** → pick
-   this repo. Railway detects the Dockerfile and builds automatically.
-3. In the service's **Variables**, set `LINKEDIN_LI_AT` and `LINKEDIN_JSESSIONID` (from a
-   dedicated/throwaway account — see [Known limitations](#known-limitations)). Optionally
-   `API_KEY`, `OUTBOUND_PROXY_URL`.
-4. **Settings → Networking → Generate Domain** for a public HTTPS URL.
-5. Verify: `/health`, the live docs at `/docs`, and `/demo` (a parsed sample that works
-   even if live fetches are IP-blocked).
+> The free instance **sleeps after ~15 min idle**; the first request after that cold-starts
+> (~30–60 s) before responding. Fine for a demo — just expect the first hit to be slow.
+
+### Railway (alternative)
+Config in [`railway.toml`](railway.toml): **New Project → Deploy from GitHub repo**, set the
+same env vars, then **Settings → Networking → Generate Domain**. (Railway has no free tier —
+expect a small usage cost.)
 
 ### Docker (local or any host)
 ```bash
@@ -163,9 +169,9 @@ docker run -p 8000:8000 --env-file .env linkedin-profile-api
 ```
 
 > **Note on cloud egress:** LinkedIn blocks most datacenter IPs, so live fetches from any
-> cloud host (Railway/Fly/Render/VPS alike) may return HTTP `999`. `/health`, `/docs`, and
-> the typed error responses work regardless; for successful live fetches from the cloud,
-> set `OUTBOUND_PROXY_URL` to a residential/mobile proxy. See
+> cloud host (Render/Railway/Fly/VPS alike) may return HTTP `999`. `/health`, `/docs`,
+> `/demo`, and the typed error responses work regardless; for successful live fetches from
+> the cloud, set `OUTBOUND_PROXY_URL` to a residential/mobile proxy. See
 > [Known limitations](#known-limitations).
 
 ## Testing
