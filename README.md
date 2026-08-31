@@ -9,6 +9,23 @@ directly. **No browser, no Selenium/Playwright**: purely reverse-engineered HTTP
 GET /profile?url=https://www.linkedin.com/in/williamhgates/
 ```
 
+## 🔗 Live demo
+
+Deployed on Railway: **https://linkedin-profile-api-production-897a.up.railway.app**
+
+| Endpoint | What it does |
+|---|---|
+| [`/docs`](https://linkedin-profile-api-production-897a.up.railway.app/docs) | Interactive Swagger UI |
+| [`/demo`](https://linkedin-profile-api-production-897a.up.railway.app/demo) | Parsed **synthetic** sample (works with no cookie) |
+| [`/health`](https://linkedin-profile-api-production-897a.up.railway.app/health) | Liveness |
+| `/profile?url=…` | Live scrape of a real profile (uses the server's session) |
+
+```bash
+curl "https://linkedin-profile-api-production-897a.up.railway.app/profile?url=https://www.linkedin.com/in/williamhgates/"
+# → { "profile": { "full_name": "Bill Gates", "headline": "Chair, Gates Foundation …",
+#     "location": {"text": "Seattle, Washington, United States"}, "experience": [ … ], … } }
+```
+
 > **Status:** working end-to-end against live LinkedIn via the **Dash** endpoint
 > (`identity/dash/profiles`), verified on a real capture. The legacy REST `profileView`
 > endpoint is now **`410 Gone`**. Core fields — name, headline, location, about, industry,
