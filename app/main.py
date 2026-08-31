@@ -18,6 +18,7 @@ from pathlib import Path
 from fastapi import Depends, FastAPI, Header, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, RedirectResponse
+from pydantic import BaseModel
 
 from app import __version__
 from app.cache import TTLCache
@@ -26,6 +27,7 @@ from app.errors import AuthenticationError, LinkedInError
 from app.linkedin.parser import parse_dash_profile
 from app.schemas import ProfileResponse, ResponseMeta
 from app.service import ProfileService
+from app.session import build_pool
 
 _SAMPLE_PROFILE = json.loads((Path(__file__).parent / "data" / "sample_dash_profile.json").read_text())
 
@@ -36,7 +38,8 @@ logging.basicConfig(level=getattr(logging, settings.log_level.upper(), logging.I
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     app.state.cache = TTLCache(settings.cache_ttl_seconds)
-    app.state.service = ProfileService(settings, app.state.cache)
+    app.state.pool = build_pool(settings)
+    app.state.service = ProfileService(settings, app.state.cache, app.state.pool)
     yield
 
 
@@ -58,10 +61,26 @@ app.add_middleware(
 )
 
 
-# ── auth dependency ──────────────────────────────────────────────────────────
+# ── auth dependencies ────────────────────────────────────────────────────────
 async def require_api_key(x_api_key: str | None = Header(default=None)) -> None:
     if settings.api_key and x_api_key != settings.api_key:
         raise AuthenticationError("Missing or invalid API key.", detail={"header": "X-API-Key"})
+
+
+async def require_admin(x_api_key: str | None = Header(default=None)) -> None:
+    # Admin routes are OFF unless an API_KEY is configured, and then require it.
+    if not settings.api_key:
+        raise AuthenticationError(
+            "Admin endpoints are disabled. Set the API_KEY variable to enable them.",
+            detail={"hint": "no API_KEY configured"},
+        )
+    if x_api_key != settings.api_key:
+        raise AuthenticationError("Missing or invalid API key.", detail={"header": "X-API-Key"})
+
+
+class SessionUpdate(BaseModel):
+    li_at: str
+    jsessionid: str
 
 
 # ── error handling ───────────────────────────────────────────────────────────
@@ -84,6 +103,18 @@ async def health() -> dict:
 @app.get("/session/status")
 async def session_status() -> dict:
     return await app.state.service.session_status()
+
+
+@app.post("/admin/session", dependencies=[Depends(require_admin)])
+async def refresh_session(body: SessionUpdate) -> dict:
+    """Hot-swap a fresh LinkedIn cookie into the running service — no redeploy.
+
+    Protected by `X-API-Key`. Mint the cookie on a residential machine (where LinkedIn
+    login works), then POST it here; it becomes the preferred cookie immediately. See
+    `scripts/refresh_cookie.py`.
+    """
+    cookie = await app.state.pool.upsert(body.li_at.strip(), body.jsessionid.strip())
+    return {"ok": True, "active": cookie.label, "pool": app.state.pool.status()}
 
 
 @app.get("/demo", response_model=ProfileResponse)

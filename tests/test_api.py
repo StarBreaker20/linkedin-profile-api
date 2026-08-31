@@ -36,3 +36,19 @@ def test_profile_requires_configured_session():
         r = client.get("/profile", params={"url": "https://www.linkedin.com/in/williamhgates/"})
         assert r.status_code == 503
         assert r.json()["error"] == "configuration_error"
+
+
+def test_session_status_reports_pool():
+    with TestClient(app) as client:
+        r = client.get("/session/status")
+        assert r.status_code == 200
+        body = r.json()
+        assert "pool" in body and "alive" in body  # no cookie in tests -> alive False
+
+
+def test_admin_session_disabled_without_api_key():
+    # With no API_KEY configured, the runtime-refresh endpoint is locked down (401), not open.
+    with TestClient(app) as client:
+        r = client.post("/admin/session", json={"li_at": "x", "jsessionid": '"ajax:1"'})
+        assert r.status_code == 401
+        assert r.json()["error"] == "authentication_failed"

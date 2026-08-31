@@ -199,13 +199,38 @@ pytest          # parser + utilities, no network needed
 ruff check .
 ```
 
+## Session resilience (cookie pool + refresh)
+
+A single session cookie is a single point of failure — LinkedIn kills it the moment traffic
+looks automated (especially from a datacenter IP). The service is built for that:
+
+- **Cookie pool + auto-rotation.** Supply several cookies (each from a separate throwaway
+  account) via `LINKEDIN_COOKIES`. The service uses the first healthy one; when LinkedIn
+  rejects it (`401`/checkpoint), it marks that cookie dead and **rotates to the next** —
+  no redeploy, no downtime while any cookie survives. `/session/status` reports pool health
+  (`{"alive": n, "total": m}`).
+- **Runtime refresh (no redeploy).** `POST /admin/session` (protected by `X-API-Key`)
+  hot-swaps a fresh cookie into the running service. Mint the cookie on a residential machine
+  where LinkedIn login works, then push it with `scripts/refresh_cookie.py`:
+  ```bash
+  BASE_URL="https://…up.railway.app" API_KEY="…" \
+  LI_AT="AQ…" JSESSIONID='"ajax:123"' python -m scripts.refresh_cookie
+  ```
+- **Why not fully automate login?** Minting a *new* cookie requires a real LinkedIn login,
+  which triggers CAPTCHA + email/SMS OTP + device challenges — not reliably automatable from
+  a server, and it would need a browser (which this challenge forbids). So the design keeps
+  login manual/residential and automates only rotation + delivery. **For real longevity, the
+  highest-leverage fix is `OUTBOUND_PROXY_URL` → a residential proxy**, which stops LinkedIn
+  killing sessions for datacenter IPs in the first place.
+
 ## Known limitations
 
 - **Datacenter IP blocking.** LinkedIn frequently returns HTTP `999` to cloud IPs. A
   residential/mobile proxy (`OUTBOUND_PROXY_URL`) is the practical mitigation; the client
   supports it out of the box.
-- **Cookie lifetime.** `li_at` expires (weeks) and can be invalidated by LinkedIn's
-  risk systems. `/session/status` surfaces this; production would refresh/rotate cookies.
+- **Cookie lifetime.** `li_at` expires and is invalidated by LinkedIn's risk systems
+  (often within minutes from a cloud IP). Mitigated by the cookie pool + rotation + the
+  `/admin/session` refresh endpoint above; `/session/status` surfaces liveness.
 - **`queryId` rotation.** LinkedIn rotates GraphQL query IDs; they're captured live and
   a stale one is reported clearly rather than failing silently.
 - **Connection-gated fields.** Some data (full contact info, exact connections) requires a

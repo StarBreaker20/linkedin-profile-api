@@ -17,9 +17,13 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
-    # LinkedIn session
+    # LinkedIn session — a single primary cookie (backward-compatible) …
     linkedin_li_at: str = ""
     linkedin_jsessionid: str = ""
+    # … and/or a pool of throwaway-account cookies as a JSON array, e.g.
+    #   [{"li_at":"AQ…","jsessionid":"\"ajax:123\""}, {"li_at":"…","jsessionid":"…"}]
+    # The service rotates to the next cookie automatically when one is killed by LinkedIn.
+    linkedin_cookies: str = ""
 
     # Networking
     outbound_proxy_url: str = ""

@@ -33,6 +33,7 @@ from app.errors import (
     UpstreamParseError,
 )
 from app.linkedin.ratelimit import AsyncRateLimiter
+from app.session import Cookie
 
 logger = logging.getLogger(__name__)
 
@@ -54,8 +55,11 @@ _RETRYABLE = {429, 500, 502, 503, 504, 999}
 
 
 class VoyagerClient:
-    def __init__(self, settings: Settings, *, max_retries: int = 3, timeout: float = 20.0) -> None:
+    def __init__(
+        self, settings: Settings, cookie: Cookie, *, max_retries: int = 3, timeout: float = 20.0
+    ) -> None:
         self.settings = settings
+        self.cookie = cookie
         self.max_retries = max_retries
         self.timeout = timeout
         self._limiter = AsyncRateLimiter(settings.linkedin_max_rpm)
@@ -105,7 +109,7 @@ class VoyagerClient:
             separators=(",", ":"),
         )
         return {
-            "csrf-token": self.settings.csrf_token,
+            "csrf-token": self.cookie.csrf_token,
             "accept": ACCEPT_NORMALIZED,
             "accept-language": "en-US,en;q=0.9",
             "x-restli-protocol-version": "2.0.0",
@@ -119,8 +123,8 @@ class VoyagerClient:
     def _cookies(self) -> dict[str, str]:
         # JSESSIONID is sent quoted; li_at unquoted.
         return {
-            "li_at": self.settings.linkedin_li_at,
-            "JSESSIONID": f'"{self.settings.csrf_token}"',
+            "li_at": self.cookie.li_at,
+            "JSESSIONID": f'"{self.cookie.csrf_token}"',
         }
 
     # ── core request ─────────────────────────────────────────────────────────
