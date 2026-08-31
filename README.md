@@ -17,8 +17,10 @@ Deployed on Railway: **https://linkedin-profile-api-production-897a.up.railway.a
 |---|---|
 | [`/docs`](https://linkedin-profile-api-production-897a.up.railway.app/docs) | Interactive Swagger UI |
 | [`/demo`](https://linkedin-profile-api-production-897a.up.railway.app/demo) | Parsed **synthetic** sample (works with no cookie) |
-| [`/health`](https://linkedin-profile-api-production-897a.up.railway.app/health) | Liveness |
-| `/profile?url=…` | Live scrape of a real profile (uses the server's session) |
+| [`/health`](https://linkedin-profile-api-production-897a.up.railway.app/health) | Liveness + version |
+| [`/session/status`](https://linkedin-profile-api-production-897a.up.railway.app/session/status) | Cookie-pool health (`{alive, total, dead}`) |
+| `/profile?url=…` | Live scrape of a real profile (uses the server's session pool) |
+| `POST /admin/session` | Hot-swap a fresh cookie at runtime (`X-API-Key`) |
 
 ```bash
 curl "https://linkedin-profile-api-production-897a.up.railway.app/profile?url=https://www.linkedin.com/in/williamhgates/"
@@ -60,11 +62,12 @@ The full teardown lives in [`REVERSE_ENGINEERING.md`](REVERSE_ENGINEERING.md).
 
 ```
 app/
-├── main.py              FastAPI app: /health, /session/status, /profile, /docs
+├── main.py              FastAPI app: /health, /session/status, /admin/session, /demo, /profile, /docs
 ├── config.py            env-driven settings (cookies stay in the environment)
+├── session.py           cookie pool: health tracking + auto-rotation + runtime refresh
 ├── errors.py            typed error taxonomy -> HTTP status mapping
 ├── schemas.py           versioned Pydantic response contract
-├── service.py           orchestration: fetch plan, cache, partial results, assembly
+├── service.py           orchestration: fetch plan, cookie rotation, cache, partial results
 ├── cache.py             pluggable async TTL cache
 └── linkedin/
     ├── client.py        Voyager HTTP client: auth, headers, CSRF, pacing, retries
@@ -75,8 +78,25 @@ app/
     └── urls.py          profile-URL validation + SSRF guard
 ```
 
-**Request flow:** validate URL → check session → cache lookup → concurrent Voyager
-fetches → denormalize + parse each section independently → assemble typed response with
+```mermaid
+flowchart TD
+    C[Client] -->|GET /profile?url=…| A[FastAPI · SSRF-guarded URL validation]
+    A --> K{Cache hit?}
+    K -->|yes| OUT[ProfileResponse]
+    K -->|no| POOL[Cookie pool — pick a healthy cookie]
+    POOL --> VOY[Voyager call: identity/dash/profiles]
+    VOY -->|401 / checkpoint| ROT[Mark cookie dead → rotate to next]
+    ROT --> POOL
+    VOY -->|HTTP 999| BLK[403 blocked · typed error]
+    VOY -->|200 normalized+json| DEC[Denormalize included URN graph]
+    DEC --> PAR[Parse each section independently]
+    PAR --> ASM[Assemble: meta.partial + per-section status]
+    ASM --> OUT
+```
+
+**Request flow:** validate URL (SSRF guard) → pick a healthy cookie from the pool → cache
+lookup → Voyager fetch (on `401`/checkpoint, mark that cookie dead and **rotate** to the
+next) → denormalize + parse each section independently → assemble typed response with
 `meta.partial` + per-section status → cache → return.
 
 ## Quickstart (local)
@@ -101,8 +121,9 @@ committed** — `.env` is git-ignored.
 
 | Variable | Required | Default | Purpose |
 |---|---|---|---|
-| `LINKEDIN_LI_AT` | yes | — | LinkedIn auth cookie |
-| `LINKEDIN_JSESSIONID` | yes | — | Session cookie; CSRF token is derived from it |
+| `LINKEDIN_LI_AT` | yes* | — | LinkedIn auth cookie (*or supply a pool via `LINKEDIN_COOKIES`) |
+| `LINKEDIN_JSESSIONID` | yes* | — | Session cookie; CSRF token is derived from it |
+| `LINKEDIN_COOKIES` | no | — | JSON array of `{li_at, jsessionid}` — a cookie **pool** for auto-rotation |
 | `OUTBOUND_PROXY_URL` | no | — | Residential/mobile proxy for production egress |
 | `API_KEY` | no | — | If set, clients must send `X-API-Key` |
 | `LINKEDIN_MAX_RPM` | no | `8` | Requests/min budget toward LinkedIn |
@@ -125,27 +146,51 @@ Returns a `ProfileResponse`:
   "meta": {
     "schema_version": "1.0",
     "source_url": "https://www.linkedin.com/in/williamhgates/",
-    "fetched_at": "2026-08-30T12:00:00+00:00",
+    "fetched_at": "2026-08-31T12:00:00+00:00",
     "cached": false,
-    "partial": false,
-    "elapsed_ms": 812,
-    "sections": [{ "section": "experience", "ok": true }]
+    "partial": true,                 // true while skills/certs/languages are unfetched cards
+    "elapsed_ms": 476,
+    "sections": [                     // per-section status — the response never overstates what it fetched
+      { "section": "basics",         "ok": true  },
+      { "section": "experience",     "ok": true  },
+      { "section": "education",      "ok": true  },
+      { "section": "skills",         "ok": false, "error": "not_fetched: served by a separate profile card" },
+      { "section": "certifications", "ok": false, "error": "not_fetched: served by a separate profile card" },
+      { "section": "languages",      "ok": false, "error": "not_fetched: served by a separate profile card" }
+    ]
   },
   "profile": {
     "full_name": "…", "headline": "…", "location": { "text": "…" }, "about": "…",
-    "experience": [ … ], "education": [ … ], "skills": [ … ],
-    "certifications": [ … ], "languages": [ … ],
-    "profile_picture": { "url": "…" }
+    "experience": [ … ], "education": [ … ],
+    "skills": [], "certifications": [], "languages": [],
+    "profile_picture": { "url": "…", "artifacts": [ … ] }
   }
 }
 ```
+
+> The `sections` array + `meta.partial` are a deliberate honesty contract: `basics`,
+> `experience`, and `education` come from the single `FullProfileWithEntities` call and
+> report real parse status, while `skills`/`certifications`/`languages` live in *separate*
+> profile cards this call doesn't request — so they report `not_fetched` rather than a
+> misleading empty-but-"ok". See a live copy of this exact shape (synthetic data) at
+> [`/demo`](https://linkedin-profile-api-production-897a.up.railway.app/demo).
 
 Errors are typed and documented — e.g. `401 authentication_failed` (dead cookie),
 `429 rate_limited`, `403 blocked` (HTTP 999), `403 challenge_required`,
 `404 profile_not_found`, `422 invalid_profile_url`.
 
 ### `GET /session/status`
-Reports whether the configured cookie is still valid — useful for monitoring.
+Live health of the **cookie pool** — probes the current cookie against LinkedIn and
+reports `{ "configured": true, "alive": true, "pool": { "total": 2, "alive": 2, "dead": 0 } }`.
+A rejected cookie is marked dead (so the next `/profile` rotates past it). Useful for
+monitoring / uptime checks.
+
+### `POST /admin/session`
+Hot-swaps a freshly-minted cookie into the running pool with **no redeploy** — the pushed
+cookie becomes the preferred one immediately. Disabled unless `API_KEY` is set, and then
+requires it via the `X-API-Key` header. Body: `{ "li_at": "AQ…", "jsessionid": "\"ajax:…\"" }`.
+Login stays manual/residential on purpose (see [Session resilience](#session-resilience-cookie-pool--refresh));
+`scripts/refresh_cookie.py` is the client for this endpoint.
 
 ### `GET /demo`
 Runs a bundled **synthetic** sample profile through the real parser — shows the exact

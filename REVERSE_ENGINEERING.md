@@ -108,9 +108,11 @@ literal. See [`endpoints.py`](app/linkedin/endpoints.py) `encode_restli`.
 Implemented in [`app/service.py`](app/service.py) with graceful per-section status.
 
 ## 7. Field → source (summary)
-Name / headline / location / about / industry, experience, education, skills, certifications,
-languages and images come from the profile tree (Dash entities or legacy `*View.elements`);
-contact info from `profileContactInfo`; connections/followers from `networkinfo`. Exact
+Name / headline / location / about / industry, experience, education and images come from the
+profile tree (Dash `FullProfileWithEntities` entities, or legacy `*View.elements`). **Skills,
+certifications and languages are separate profile cards** — fetched additively, and currently
+reported as `not_fetched` per-section rather than faked (see README); contact info from
+`profileContactInfo`; connections/followers from `networkinfo`. Exact
 per-element field names (`degreeName`, `fieldOfStudy`, `authority`, `dateRange`, skill
 endorsement counts, open-to-work) are **[capture-pending]** and pinned from one live payload.
 
@@ -127,6 +129,12 @@ What we **intentionally do not build:** TLS/JA3 fingerprint spoofing, residentia
 anti-abuse-circumvention measures; getting blocked is instead documented honestly as a
 **known limitation**. This is both the responsible choice and, frankly, the more defensible
 engineering story.
+
+> **Not to be confused with the cookie pool.** The `LINKEDIN_COOKIES` pool + auto-rotation
+> ([`session.py`](app/session.py)) is *resilience*, not evasion: when LinkedIn legitimately
+> retires a cookie, the service fails over to a spare so it stays up — it does **not** rotate
+> identities or IPs to dodge a block, hide traffic, or defeat rate limits. A block is still
+> surfaced honestly (HTTP `999` → `403 blocked`), never engineered around.
 
 **Legal/ethical:** automated access is contrary to LinkedIn's Terms of Service, and profile
 data is personal data (GDPR/CCPA). This project is an API-reverse-engineering exercise; use
