@@ -31,7 +31,16 @@ def test_parse_dash_profile_basics():
     assert profile.location.country == "gb"
     # Inline vectorImage -> largest artifact URL assembled from rootUrl + segment.
     assert profile.profile_picture.url == "https://media.licdn.com/pic/400/a.jpg"
-    assert all(s.ok for s in sections)
+    # Core sections this endpoint actually delivers parse cleanly...
+    by_section = {s.section: s for s in sections}
+    assert by_section["basics"].ok
+    assert by_section["experience"].ok
+    assert by_section["education"].ok
+    # ...while skills/certifications/languages come from separate cards this call does not
+    # fetch, so they report an honest not_fetched rather than a misleading ok:true.
+    for name in ("skills", "certifications", "languages"):
+        assert by_section[name].ok is False
+        assert "not_fetched" in by_section[name].error
 
 
 def test_parse_dash_profile_experience_is_two_level():
@@ -60,7 +69,8 @@ def test_parse_dash_profile_education_and_empty_skills():
     assert edu.grade == "First"
     assert edu.school_logo.url == "https://media.licdn.com/sc/200/s.jpg"
     assert edu.date_range.start.year == 1832
-    # Skills are a separate card; empty collection here degrades to [], not an error.
+    # Skills come from a separate card: the profile field is [] and the section status
+    # reports not_fetched (asserted in test_parse_dash_profile_basics), not a bare ok:true.
     assert profile.skills == []
 
 

@@ -320,7 +320,8 @@ def parse_dash_profile(response: dict[str, Any], public_id: str | None = None) -
         profile.education = items
 
     def skills() -> None:
-        # Present only when the skills card is merged in; empty in FullProfileWithEntities.
+        # `*profileSkills` is only present when the dedicated skills card is merged in;
+        # it is absent from FullProfileWithEntities, so this normally yields [].
         sk_coll = graph.resolve(prof.get("*profileSkills"))
         out: list[Skill] = []
         for surn in (sk_coll or {}).get("*elements") or []:
@@ -332,5 +333,22 @@ def parse_dash_profile(response: dict[str, Any], public_id: str | None = None) -
     section("basics", basics)
     section("experience", experience)
     section("education", education)
-    section("skills", skills)
+    skills()
+
+    # Skills, certifications and languages live in *separate* profile cards that the
+    # FullProfileWithEntities call does not request. Report them by what we actually got:
+    # `ok` only when entries are present (e.g. once a skills card is merged in), otherwise
+    # a clear `not_fetched` — never a bare ok:true on a section this endpoint never fetched.
+    # This is what makes meta.partial honestly reflect the gap (see README "Known limitations").
+    not_fetched = "not_fetched: served by a separate profile card (see README: Known limitations)"
+    for name, values in (
+        ("skills", profile.skills),
+        ("certifications", profile.certifications),
+        ("languages", profile.languages),
+    ):
+        statuses.append(
+            SectionStatus(section=name, ok=True)
+            if values
+            else SectionStatus(section=name, ok=False, error=not_fetched)
+        )
     return profile, statuses
