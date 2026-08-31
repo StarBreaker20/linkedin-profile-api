@@ -12,22 +12,12 @@ Both HOST and PORT can still be overridden via env.
 from __future__ import annotations
 
 import os
-import socket
 
 import uvicorn
 
-
-def _default_host() -> str:
-    """Prefer IPv6 dual-stack ("::") so Railway's IPv6 routing/health-checks can reach us;
-    fall back to IPv4 ("0.0.0.0") on hosts without IPv6 (some CI / sandboxes)."""
-    try:
-        socket.socket(socket.AF_INET6, socket.SOCK_STREAM).close()
-        return "::"
-    except OSError:
-        return "0.0.0.0"
-
-
 if __name__ == "__main__":
-    host = os.environ.get("HOST") or _default_host()
+    # Railway (and most PaaS) route public traffic to the container on 0.0.0.0; bind there
+    # by default. HOST can override (e.g. "::" for a pure-IPv6 private-networking setup).
+    host = os.environ.get("HOST", "0.0.0.0")
     port = int(os.environ.get("PORT", "8000"))
     uvicorn.run("app.main:app", host=host, port=port)
